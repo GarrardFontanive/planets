@@ -1,47 +1,46 @@
-import org.w3c.dom.html.HTMLDocument;
-
-import java.io.*;
-import java.util.Arrays;
+import java.io.BufferedReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.URL;
+import java.net.URLConnection;
 
 public class Main {
-    public static void main(String[] args){
+    public static void main(String[] args) throws Exception {
 
-        String filePath = "src/main/resources/planet_data.csv";
-        int startLine = 49;
-        String line;
-        double totalOrbitalDays = 0;
-        int totalPlanets = 0;
+        final String URLDATABASE = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync?query=";
 
-        try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
-            int currentLine = 1;
+        //data gathered from the query: planet name, discovery year, discovery method, orbital period,
+        // planet radius (earth), planet mass (earth) and distance (pc).
+        final String SQLSTATEMENT = "select+pl_name,disc_year,discoverymethod,pl_orbper,pl_rade,pl_masse,sy_dist" +
+                "+from+ps&format=csv";
 
-            while (currentLine < startLine && (line = br.readLine()) != null) {
-                currentLine++;
+        URL url = new URL(URLDATABASE + SQLSTATEMENT);
+        URLConnection connection = url.openConnection();
+        FileWriter file = new FileWriter("output.txt");
+
+        BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+        String inputLine;
+        String lastPlanet = "";
+        String[] line;
+
+        while ((inputLine = reader.readLine()) != null) {
+
+            line = inputLine.split(",");
+
+
+            if (lastPlanet.equals(line[0])) {
+                System.out.println(lastPlanet + " is a duplicate.");
+            } else {
+                file.write(inputLine + "\n");
             }
 
-            while ((line = br.readLine()) != null) {
-                String[] values = line.split(",");
-                for(int i = 0; i < values.length; i++){
-                    if(values[i].isEmpty()){
-                        values[i] = "0";
-                    }
-                }
-                Planet planet = new Planet(values[0], Integer.parseInt(values[6]), Double.parseDouble(values[11]),
-                        Double.parseDouble(values[15]));
+            lastPlanet = line[0];
 
-
-
-                System.out.println(planet);
-                totalOrbitalDays += Double.parseDouble(values[11]);
-                totalPlanets++;
-
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
         }
+        file.close();
 
-        System.out.println("Average of total Orbital Days: " + totalOrbitalDays/totalPlanets);
-        System.out.println("Total planets: " + totalPlanets);
+        reader.close();
 
 
 

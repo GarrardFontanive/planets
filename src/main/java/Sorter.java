@@ -36,49 +36,43 @@ public class Sorter {
                 String[] lastLine = {""};
                 ArrayList<String[]> duplicates = new ArrayList<>();
 
-                //remove later
-                int x = 0;
-
-
                 while ((inputLine = reader.readLine()) != null) {
 
                     currentLine = inputLine.split(",");
 
-                    if (currentLine[0].equals(lastLine[0])) {
+                    if (currentLine.length < 7) {
+                        //Skips if the current line has less than 7 elements.
+                        continue;
+                    } else if (currentLine[0].equals(lastLine[0])) {
                         duplicates.add(lastLine);
 
                     } else if (duplicates.size() > 1) {
 
-                        String item = "";
-                        String[] itemData = {};
+                        String blankItem = "";
+                        String[] line = {};
                         int randomNumber;
-                        int blankPosition;
+                        int blankPosition = containsBlank(duplicates.getFirst());
 
-                        blankPosition = containsBlank(duplicates.getFirst());
-
-
-                        if (blankPosition >= 0) {
+                        while (blankPosition > -1) {
 
                             int i = 0;
 
                             do {
                                 randomNumber = random.nextInt(duplicates.size());
-                                itemData = duplicates.get(randomNumber);
-                                if (itemData.length < 7){
-                                    break;
-                                }
-                                item = itemData[blankPosition];
-                                itemData[blankPosition] = item;
+                                line = duplicates.get(randomNumber);
+                                blankItem = line[blankPosition];
 
-                                if(i >= 10){
-                                    item = "0";
+                                if (i >= 10) {
+                                    blankItem = "0";
                                 }
 
-                                duplicates.set(0, itemData);
+                                line[blankPosition] = blankItem;
+                                duplicates.set(0, line);
 
                                 i++;
-                            } while (item.isBlank());
+                            } while (blankItem.isBlank());
 
+                            blankPosition = containsBlank(duplicates.getFirst());
                         }
 
                         file.write(Arrays.toString(duplicates.getFirst()) + "\n");
@@ -87,10 +81,12 @@ public class Sorter {
                     } else {
 
                         file.write(inputLine + "\n");
+                        duplicates.clear();
 
                     }
 
                     lastLine = currentLine;
+
                 }
 
                 file.close();
@@ -112,7 +108,7 @@ public class Sorter {
 
     public int containsBlank(String[] data) {
         /*
-          Searches the array for a blank value, if the value is found return de position of the blank, else return -1.
+          Returns the index of the first occurrence of a blank value, if no blanks are found the return -1;
          */
         for (int i = 0; i < data.length; i++) {
             if (data[i].isBlank()) {
@@ -121,6 +117,7 @@ public class Sorter {
         }
         return -1;
     }
+
 
 }
 

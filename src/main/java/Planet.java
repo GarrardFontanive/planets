@@ -1,6 +1,5 @@
 public class Planet {
 
-    //select+pl_name,disc_year,discoverymethod,pl_orbper,pl_rade,pl_masse,sy_dist" +
     private String name;
     private int discoveryYear;
     private String discoveryMethod;
@@ -9,15 +8,17 @@ public class Planet {
     private double mass;
     private double distance;
 
-    Planet(){}
+    public Planet() {
+    }
 
-    Planet(String name, int discoveryYear, String discoveryMethod, double orbitalPeriod, double radius, double distance){
-        setName(name);
-        setDiscoveryYear(discoveryYear);
-        setDiscoveryMethod(discoveryMethod);
-        setOrbitalPeriod(orbitalPeriod);
-        setRadius(radius);
-        setMass(distance);
+    public Planet(String name, int discoveryYear, String discoveryMethod, double orbitalPeriod, double radius, double mass, double distance) {
+        this.name = name;
+        this.discoveryYear = discoveryYear;
+        this.discoveryMethod = discoveryMethod;
+        this.orbitalPeriod = orbitalPeriod;
+        this.radius = radius;
+        this.mass = mass;
+        this.distance = distance;
     }
 
     public String getName() {
@@ -78,16 +79,14 @@ public class Planet {
 
     @Override
     public String toString() {
-        final StringBuilder sb = new StringBuilder("Planet{");
-        sb.append("name='").append(name).append('\'');
-        sb.append(", discoveryYear=").append(discoveryYear);
-        sb.append(", discoveryMethod='").append(discoveryMethod).append('\'');
-        sb.append(", orbitalPeriod=").append(orbitalPeriod);
-        sb.append(", radius=").append(radius);
-        sb.append(", mass=").append(mass);
-        sb.append(", distance=").append(distance);
-        sb.append('}');
-        return sb.toString();
+        return "Planet{" +
+                "name='" + name + '\'' +
+                ", discoveryYear=" + discoveryYear +
+                ", discoveryMethod='" + discoveryMethod + '\'' +
+                ", orbitalPeriod=" + orbitalPeriod +
+                ", radius=" + radius +
+                ", mass=" + mass +
+                ", distance=" + distance +
+                '}';
     }
-
 }

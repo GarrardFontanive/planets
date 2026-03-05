@@ -1,21 +1,209 @@
-import java.io.BufferedReader;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.URL;
-import java.net.URLConnection;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Random;
-import java.util.ArrayList;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpServer;
 
+import java.awt.Desktop;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class Main {
-    public static void main(String[] args) throws Exception {
-        Random random = new Random();
 
+    private static final String OUTPUT_FILE = "saida.txt";
+    private static final String TEMPLATE_FILE = "src/web/template.html";
+    private static final double EARTH_ORBITAL_PERIOD_DAYS = 365.25;
+    private static final double EARTH_RADIUS_KM = 6371.0;
+    private static final double EARTH_MASS_KG = 5.972e24;
+
+    public static void main(String[] args) throws Exception {
         Sorter sorter = new Sorter();
         sorter.queryData();
 
+        DataProcessor processor = new DataProcessor();
+        Calculations calc = new Calculations();
+
+        Map<String, PlanetAggregate> dadosAgrupados;
+        try {
+            dadosAgrupados = processor.extrairDadosValidos(OUTPUT_FILE);
+        } catch (Exception e) {
+            e.printStackTrace();
+            dadosAgrupados = new HashMap<>();
+        }
+
+        List<Planet> planetasConsolidados = new ArrayList<>();
+        String todosOsDadosJson = montarJson(dadosAgrupados, calc, planetasConsolidados);
+
+        HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
+
+        server.createContext("/", exchange -> {
+            byte[] htmlBytes = Files.readAllBytes(Path.of(TEMPLATE_FILE));
+            responder(exchange, 200, htmlBytes, "text/html; charset=UTF-8");
+        });
+
+        server.createContext("/dados", exchange ->
+                responder(exchange, 200, todosOsDadosJson, "application/json; charset=UTF-8"));
+
+        server.createContext("/atualizar-banco", exchange -> executarAcao(
+                exchange,
+                () -> new Conexao().salvarNoMySQL(planetasConsolidados),
+                "Banco de dados MySQL atualizado com sucesso!"
+        ));
+
+        server.createContext("/limpar-banco", exchange -> executarAcao(
+                exchange,
+                () -> new Conexao().limparBaseDeDados(),
+                "Base de dados limpa com sucesso!"
+        ));
+
+        server.createContext("/gerar-json", exchange -> executarAcao(
+                exchange,
+                () -> new Percistencia().salvarJSON(planetasConsolidados),
+                "Arquivo planetas.json gerado com sucesso!"
+        ));
+
+        server.createContext("/gerar-xml", exchange -> executarAcao(
+                exchange,
+                () -> new Percistencia().salvarXML(planetasConsolidados),
+                "Arquivo planetas.xml gerado com sucesso!"
+        ));
+
+        server.setExecutor(null);
+        server.start();
+        abrirNoNavegador();
+    }
+
+    private static String montarJson(Map<String, PlanetAggregate> dadosAgrupados, Calculations calc, List<Planet> planetasConsolidados) {
+        StringBuilder jsonArray = new StringBuilder("[");
+        boolean first = true;
+
+        for (Map.Entry<String, PlanetAggregate> entry : dadosAgrupados.entrySet()) {
+            PlanetAggregate agregado = entry.getValue();
+
+            if (agregado.getOrbitalPeriods().isEmpty() || agregado.getRadii().isEmpty() || agregado.getMasses().isEmpty()) {
+                continue;
+            }
+
+            int qtdAmostras = agregado.getSampleCount();
+            String nomeSeguro = entry.getKey().replace("\"", "").replace("\\", "").trim();
+            String nomeComAmostras = nomeSeguro + " (" + qtdAmostras + " amostras)";
+
+            double periodoMedia = numeroSeguro(calc.calcularMedia(agregado.getOrbitalPeriods()));
+            double periodoMediana = numeroSeguro(calc.calcularMediana(agregado.getOrbitalPeriods()));
+            double periodoVariancia = numeroSeguro(calc.calcularVariancia(agregado.getOrbitalPeriods()));
+            double periodoModa = numeroSeguro(calc.calcularModa(agregado.getOrbitalPeriods()));
+
+            double raioMedia = numeroSeguro(calc.calcularMedia(agregado.getRadii()));
+            double raioMediana = numeroSeguro(calc.calcularMediana(agregado.getRadii()));
+            double raioVariancia = numeroSeguro(calc.calcularVariancia(agregado.getRadii()));
+            double raioModa = numeroSeguro(calc.calcularModa(agregado.getRadii()));
+
+            double massaMedia = numeroSeguro(calc.calcularMedia(agregado.getMasses()));
+            double massaMediana = numeroSeguro(calc.calcularMediana(agregado.getMasses()));
+            double massaVariancia = numeroSeguro(calc.calcularVariancia(agregado.getMasses()));
+            double massaModa = numeroSeguro(calc.calcularModa(agregado.getMasses()));
+
+            double periodoTerraX = numeroSeguro(periodoMedia / EARTH_ORBITAL_PERIOD_DAYS);
+            double raioTerraX = numeroSeguro(raioMedia);
+            double massaTerraX = numeroSeguro(massaMedia);
+
+            double raioPlanetaKm = numeroSeguro(raioMedia * EARTH_RADIUS_KM);
+            double massaPlanetaKg = numeroSeguro(massaMedia * EARTH_MASS_KG);
+
+            Planet planeta = new Planet();
+            planeta.setName(nomeComAmostras);
+            planeta.setOrbitalPeriod(periodoMedia);
+            planeta.setRadius(raioMedia);
+            planeta.setMass(massaMedia);
+            planetasConsolidados.add(planeta);
+
+            if (!first) {
+                jsonArray.append(",");
+            }
+
+            jsonArray.append("{")
+                    .append("\"planeta\":\"").append(nomeComAmostras).append("\",")
+                    .append("\"periodoMedia\":").append(periodoMedia).append(",")
+                    .append("\"periodoMediana\":").append(periodoMediana).append(",")
+                    .append("\"periodoVariancia\":").append(periodoVariancia).append(",")
+                    .append("\"periodoModa\":").append(periodoModa).append(",")
+                    .append("\"raioMedia\":").append(raioMedia).append(",")
+                    .append("\"raioMediana\":").append(raioMediana).append(",")
+                    .append("\"raioVariancia\":").append(raioVariancia).append(",")
+                    .append("\"raioModa\":").append(raioModa).append(",")
+                    .append("\"massaMedia\":").append(massaMedia).append(",")
+                    .append("\"massaMediana\":").append(massaMediana).append(",")
+                    .append("\"massaVariancia\":").append(massaVariancia).append(",")
+                    .append("\"massaModa\":").append(massaModa).append(",")
+                    .append("\"periodoTerraX\":").append(periodoTerraX).append(",")
+                    .append("\"raioTerraX\":").append(raioTerraX).append(",")
+                    .append("\"massaTerraX\":").append(massaTerraX).append(",")
+                    .append("\"periodoTerraDias\":").append(EARTH_ORBITAL_PERIOD_DAYS).append(",")
+                    .append("\"raioTerraKm\":").append(EARTH_RADIUS_KM).append(",")
+                    .append("\"massaTerraKg\":").append(EARTH_MASS_KG).append(",")
+                    .append("\"periodoPlanetaDias\":").append(periodoMedia).append(",")
+                    .append("\"raioPlanetaKm\":").append(raioPlanetaKm).append(",")
+                    .append("\"massaPlanetaKg\":").append(massaPlanetaKg).append(",")
+                    .append("\"amostrasPeriodo\":").append(agregado.getOrbitalPeriods().size()).append(",")
+                    .append("\"amostrasRaio\":").append(agregado.getRadii().size()).append(",")
+                    .append("\"amostrasMassa\":").append(agregado.getMasses().size())
+                    .append("}");
+
+            first = false;
+        }
+
+        return jsonArray.append("]").toString();
+    }
+
+    private static double numeroSeguro(double valor) {
+        if (!Double.isFinite(valor) || valor < 0) {
+            return 0;
+        }
+        return valor;
+    }
+
+    private static void executarAcao(HttpExchange exchange, Acao acao, String mensagemSucesso) throws IOException {
+        try {
+            acao.executar();
+            responder(exchange, 200, mensagemSucesso, "text/plain; charset=UTF-8");
+        } catch (Exception e) {
+            e.printStackTrace();
+            responder(exchange, 500, "Erro ao processar solicitacao.", "text/plain; charset=UTF-8");
+        }
+    }
+
+    private static void responder(HttpExchange exchange, int status, String conteudo, String contentType) throws IOException {
+        responder(exchange, status, conteudo.getBytes(StandardCharsets.UTF_8), contentType);
+    }
+
+    private static void responder(HttpExchange exchange, int status, byte[] conteudo, String contentType) throws IOException {
+        exchange.getResponseHeaders().set("Content-Type", contentType);
+        exchange.sendResponseHeaders(status, conteudo.length);
+        try (OutputStream os = exchange.getResponseBody()) {
+            os.write(conteudo);
+        }
+    }
+
+    private static void abrirNoNavegador() {
+        if (!Desktop.isDesktopSupported()) {
+            return;
+        }
+
+        try {
+            Desktop.getDesktop().browse(new URI("http://localhost:8080"));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @FunctionalInterface
+    private interface Acao {
+        void executar() throws Exception;
     }
 }

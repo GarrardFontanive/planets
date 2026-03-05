@@ -1,37 +1,72 @@
-import java.io.BufferedReader;
-import java.io.FileReader;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class Calculations {
 
-    private double averageOrbitalPeriod;
-    private double averageRadius;
-    private double averageDistance;
+    public double calcularMedia(List<Double> dados) {
+        if (dados == null || dados.isEmpty()) {
+            return 0;
+        }
 
-    public double getAverageOrbitalPeriod() {
-        return averageOrbitalPeriod;
+        double soma = 0;
+        for (double valor : dados) {
+            soma += valor;
+        }
+        return soma / dados.size();
     }
 
-    public void setAverageOrbitalPeriod(double averageOrbitalPeriod) {
-        this.averageOrbitalPeriod = averageOrbitalPeriod;
+    public double calcularMediana(List<Double> dados) {
+        if (dados == null || dados.isEmpty()) {
+            return 0;
+        }
+
+        List<Double> copia = new ArrayList<>(dados);
+        Collections.sort(copia);
+        int meio = copia.size() / 2;
+
+        if (copia.size() % 2 == 0) {
+            return (copia.get(meio - 1) + copia.get(meio)) / 2.0;
+        }
+
+        return copia.get(meio);
     }
 
-    public double getAverageDistance() {
-        return averageDistance;
+    public double calcularVariancia(List<Double> dados) {
+        if (dados == null || dados.isEmpty()) {
+            return 0;
+        }
+
+        double media = calcularMedia(dados);
+        double soma = 0;
+        for (double valor : dados) {
+            double diferenca = valor - media;
+            soma += diferenca * diferenca;
+        }
+        return soma / dados.size();
     }
 
-    public void setAverageDistance(double averageDistance) {
-        this.averageDistance = averageDistance;
-    }
+    public double calcularModa(List<Double> dados) {
+        if (dados == null || dados.isEmpty()) {
+            return 0;
+        }
 
-    public double getAverageRadius() {
-        return averageRadius;
-    }
+        Map<Double, Integer> frequencias = new HashMap<>();
+        double moda = dados.get(0);
+        int maiorFrequencia = 0;
 
-    public void setAverageRadius(double averageRadius) {
-        this.averageRadius = averageRadius;
-    }
+        for (double valor : dados) {
+            int frequencia = frequencias.getOrDefault(valor, 0) + 1;
+            frequencias.put(valor, frequencia);
 
-    private double calculateDistance(Planet planet1, Planet planet2){
-        return 0;
+            if (frequencia > maiorFrequencia) {
+                maiorFrequencia = frequencia;
+                moda = valor;
+            }
+        }
+
+        return moda;
     }
 }

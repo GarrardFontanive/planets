@@ -1,9 +1,299 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Planets and bla bla</title>
+    <title>Analise de Exoplanetas</title>
+    <script src="https://www.gstatic.com/charts/loader.js"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+            color: #222;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #fff;
+            border: 1px solid #ddd;
+            padding: 20px;
+        }
+
+        select {
+            margin-top: 8px;
+            padding: 8px;
+            min-width: 340px;
+            max-width: 100%;
+        }
+
+        #resumo {
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            background: #fafafa;
+            line-height: 1.5;
+        }
+
+        .top-charts {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 16px;
+            margin-top: 20px;
+        }
+
+        .chart-top {
+            min-height: 300px;
+            border: 1px solid #eee;
+        }
+
+        .bottom-charts {
+            margin-top: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .chart-bottom {
+            min-height: 320px;
+            border: 1px solid #eee;
+        }
+
+        .actions {
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 10px 14px;
+            border: 1px solid #444;
+            background: #fff;
+            cursor: pointer;
+            margin-right: 8px;
+            margin-bottom: 8px;
+        }
+    </style>
 </head>
-<body>$body
+<body>
+<div class="container">
+    <h1>Analise Estatistica de Exoplanetas</h1>
+
+    <label for="seletorPlaneta">Selecione o planeta</label><br>
+    <select id="seletorPlaneta"></select>
+
+    <h2 id="titulo">Carregando dados...</h2>
+    <div id="resumo">Aguardando dados...</div>
+
+    <h3>Comparacao com referencia da Terra</h3>
+    <div class="top-charts">
+        <div id="grafico_comp_periodo" class="chart-top"></div>
+        <div id="grafico_comp_raio" class="chart-top"></div>
+        <div id="grafico_comp_massa" class="chart-top"></div>
+    </div>
+
+    <h3>Estatisticas por metrica</h3>
+    <div class="bottom-charts">
+        <div id="grafico_stats_periodo" class="chart-bottom"></div>
+        <div id="grafico_stats_raio" class="chart-bottom"></div>
+        <div id="grafico_stats_massa" class="chart-bottom"></div>
+    </div>
+
+    <div class="actions">
+        <button onclick="chamarApi('/atualizar-banco')">Atualizar MySQL</button>
+        <button onclick="chamarApi('/limpar-banco')">Limpar Banco</button>
+        <button onclick="chamarApi('/gerar-json')">Gerar JSON</button>
+        <button onclick="chamarApi('/gerar-xml')">Gerar XML</button>
+    </div>
+</div>
+
+<script>
+    google.charts.load('current', {packages: ['corechart']});
+    google.charts.setOnLoadCallback(carregarDados);
+
+    const seletor = document.getElementById('seletorPlaneta');
+    let dadosGlobais = [];
+
+    seletor.addEventListener('change', atualizarGrafico);
+
+    function valorSeguro(valor) {
+        const numero = Number(valor);
+        if (!Number.isFinite(numero) || numero < 0) {
+            return 0;
+        }
+        return numero;
+    }
+
+    function formatar(valor, casas = 2) {
+        return valorSeguro(valor).toFixed(casas);
+    }
+
+    function formatarInteiro(valor) {
+        return Math.round(valorSeguro(valor)).toLocaleString('pt-BR');
+    }
+
+    function formatarCientifico(valor) {
+        const n = valorSeguro(valor);
+        if (n === 0) {
+            return '0';
+        }
+        const exp = Math.floor(Math.log10(n));
+        const mant = n / Math.pow(10, exp);
+        return `${mant.toFixed(3)} x 10^${exp}`;
+    }
+
+    async function carregarDados() {
+        try {
+            const response = await fetch('/dados');
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const dados = await response.json();
+            dadosGlobais = dados;
+            seletor.innerHTML = '';
+
+            dados.forEach((item, index) => {
+                const option = document.createElement('option');
+                option.value = String(index);
+                option.textContent = item.planeta;
+                seletor.appendChild(option);
+            });
+
+            if (dados.length === 0) {
+                document.getElementById('titulo').textContent = 'Nenhum planeta com periodo, raio e massa encontrado.';
+                document.getElementById('resumo').textContent = 'Sem dados completos para exibir.';
+                return;
+            }
+
+            atualizarGrafico();
+        } catch (error) {
+            document.getElementById('titulo').textContent = 'Servidor offline em http://localhost:8080';
+            document.getElementById('resumo').textContent = 'Inicie a aplicacao Java e mantenha ela rodando para habilitar os endpoints.';
+        }
+    }
+
+    function atualizarGrafico() {
+        const index = Number(seletor.value || 0);
+        const p = dadosGlobais[index];
+        if (!p) {
+            return;
+        }
+
+        document.getElementById('titulo').textContent = p.planeta;
+        document.getElementById('resumo').innerHTML =
+            `Referencia Terra: periodo <b>${formatar(p.periodoTerraDias)} dias</b>, ` +
+            `raio <b>${formatarInteiro(p.raioTerraKm)} km</b>, ` +
+            `massa <b>${formatarCientifico(p.massaTerraKg)} kg</b>. ` +
+            `Planeta: periodo <b>${formatar(p.periodoPlanetaDias)} dias</b> (${formatar(p.periodoTerraX)}x Terra), ` +
+            `raio <b>${formatarInteiro(p.raioPlanetaKm)} km</b> (${formatar(p.raioTerraX)}x Terra), ` +
+            `massa <b>${formatarCientifico(p.massaPlanetaKg)} kg</b> (${formatar(p.massaTerraX)}x Terra).`;
+
+        desenharComparacao(
+            'grafico_comp_periodo',
+            'Periodo orbital (dias)',
+            p.periodoTerraDias,
+            p.periodoPlanetaDias,
+            'Dias'
+        );
+
+        desenharComparacao(
+            'grafico_comp_raio',
+            'Raio (km)',
+            p.raioTerraKm,
+            p.raioPlanetaKm,
+            'Km'
+        );
+
+        desenharComparacao(
+            'grafico_comp_massa',
+            'Massa (kg)',
+            p.massaTerraKg,
+            p.massaPlanetaKg,
+            'Kg'
+        );
+
+        desenharEstatisticas(
+            'grafico_stats_periodo',
+            'Periodo orbital - media, mediana, moda, variancia',
+            p.periodoMedia,
+            p.periodoMediana,
+            p.periodoModa,
+            p.periodoVariancia,
+            'Dias'
+        );
+
+        desenharEstatisticas(
+            'grafico_stats_raio',
+            'Raio - media, mediana, moda, variancia',
+            p.raioMedia,
+            p.raioMediana,
+            p.raioModa,
+            p.raioVariancia,
+            'Raios terrestres'
+        );
+
+        desenharEstatisticas(
+            'grafico_stats_massa',
+            'Massa - media, mediana, moda, variancia',
+            p.massaMedia,
+            p.massaMediana,
+            p.massaModa,
+            p.massaVariancia,
+            'Massas terrestres'
+        );
+    }
+
+    function desenharComparacao(elementId, titulo, valorTerra, valorPlaneta, eixoY) {
+        const data = new google.visualization.DataTable();
+        data.addColumn('string', 'Referencia');
+        data.addColumn('number', 'Valor');
+        data.addRows([
+            ['Terra', valorSeguro(valorTerra)],
+            ['Planeta', valorSeguro(valorPlaneta)]
+        ]);
+
+        const options = {
+            title: titulo,
+            legend: {position: 'none'},
+            vAxis: {title: eixoY, minValue: 0}
+        };
+
+        const chart = new google.visualization.ColumnChart(document.getElementById(elementId));
+        chart.draw(data, options);
+    }
+
+    function desenharEstatisticas(elementId, titulo, media, mediana, moda, variancia, eixoY) {
+        const data = new google.visualization.DataTable();
+        data.addColumn('string', 'Estatistica');
+        data.addColumn('number', 'Valor');
+        data.addRows([
+            ['Media', valorSeguro(media)],
+            ['Mediana', valorSeguro(mediana)],
+            ['Moda', valorSeguro(moda)],
+            ['Variancia', valorSeguro(variancia)]
+        ]);
+
+        const options = {
+            title: titulo,
+            legend: {position: 'none'},
+            vAxis: {title: eixoY, minValue: 0}
+        };
+
+        const chart = new google.visualization.BarChart(document.getElementById(elementId));
+        chart.draw(data, options);
+    }
+
+    async function chamarApi(rota) {
+        try {
+            const response = await fetch(rota);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const mensagem = await response.text();
+            alert(mensagem);
+        } catch (error) {
+            alert('Nao foi possivel conectar ao backend em http://localhost:8080. Inicie a aplicacao Java e tente de novo.');
+        }
+    }
+</script>
 </body>
 </html>

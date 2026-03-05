@@ -1,3 +1,5 @@
+package dto;
+
 public class Planet {
 
     private String name;

@@ -1,7 +1,11 @@
+package dao;
+
 import java.io.FileWriter;
 import java.util.List;
 
-public class Percistencia {
+import dto.Planet;
+
+public class Persistencia {
 
     public void salvarJSON(List<Planet> planetas) throws Exception {
         try (FileWriter writer = new FileWriter("planetas.json")) {
@@ -10,6 +14,9 @@ public class Percistencia {
                 Planet planeta = planetas.get(i);
                 writer.write("  {\n");
                 writer.write("    \"nome\": \"" + planeta.getName() + "\",\n");
+                writer.write("    \"discoveryYear\": " + planeta.getDiscoveryYear() + ",\n");
+                writer.write("    \"discoveryMethod\": \"" + planeta.getDiscoveryMethod() + "\",\n");
+                writer.write("    \"distanceParsec\": " + planeta.getDistance() + ",\n");
                 writer.write("    \"orbitalPeriod\": " + planeta.getOrbitalPeriod() + ",\n");
                 writer.write("    \"radiusEarth\": " + planeta.getRadius() + ",\n");
                 writer.write("    \"massEarth\": " + planeta.getMass() + "\n");
@@ -30,6 +37,9 @@ public class Percistencia {
             for (Planet planeta : planetas) {
                 writer.write("  <planeta>\n");
                 writer.write("    <nome>" + planeta.getName() + "</nome>\n");
+                writer.write("    <discoveryYear>" + planeta.getDiscoveryYear() + "</discoveryYear>\n");
+                writer.write("    <discoveryMethod>" + planeta.getDiscoveryMethod() + "</discoveryMethod>\n");
+                writer.write("    <distanceParsec>" + planeta.getDistance() + "</distanceParsec>\n");
                 writer.write("    <orbitalPeriod>" + planeta.getOrbitalPeriod() + "</orbitalPeriod>\n");
                 writer.write("    <radiusEarth>" + planeta.getRadius() + "</radiusEarth>\n");
                 writer.write("    <massEarth>" + planeta.getMass() + "</massEarth>\n");

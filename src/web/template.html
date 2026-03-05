@@ -29,10 +29,63 @@
 
         #resumo {
             margin-top: 10px;
-            padding: 10px;
+            padding: 12px;
             border: 1px solid #ddd;
             background: #fafafa;
-            line-height: 1.5;
+        }
+
+        .resumo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 10px;
+        }
+
+        .resumo-card {
+            background: #fff;
+            border: 1px solid #e4e4e4;
+            padding: 10px;
+        }
+
+        .resumo-card h4 {
+            margin: 0 0 8px;
+            font-size: 14px;
+        }
+
+        .resumo-item {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: 6px;
+            font-size: 14px;
+            align-items: flex-start;
+        }
+
+        .resumo-item span {
+            color: #555;
+            white-space: nowrap;
+        }
+
+        .resumo-item b {
+            text-align: right;
+            font-weight: 600;
+            word-break: break-word;
+        }
+
+        .metodos {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 6px;
+        }
+
+        .metodo-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border: 1px solid #bbb;
+            border-radius: 999px;
+            background: #fff;
+            font-size: 12px;
+            color: #222;
         }
 
         .top-charts {
@@ -70,6 +123,21 @@
             cursor: pointer;
             margin-right: 8px;
             margin-bottom: 8px;
+        }
+
+        @media (max-width: 640px) {
+            .resumo-item {
+                flex-direction: column;
+                gap: 4px;
+            }
+
+            .resumo-item b {
+                text-align: left;
+            }
+
+            .metodos {
+                justify-content: flex-start;
+            }
         }
     </style>
 </head>
@@ -130,6 +198,49 @@
         return Math.round(valorSeguro(valor)).toLocaleString('pt-BR');
     }
 
+    function formatarAno(valor) {
+        const ano = Number(valor);
+        if (!Number.isFinite(ano) || ano <= 0) {
+            return 'Nao informado';
+        }
+        return String(Math.trunc(ano));
+    }
+
+    function normalizarMetodos(valor) {
+        if (Array.isArray(valor)) {
+            return valor
+                .map((item) => String(item || '').trim())
+                .filter((item) => item.length > 0);
+        }
+
+        const texto = String(valor || '').trim();
+        if (!texto) {
+            return [];
+        }
+
+        return [texto];
+    }
+
+    function escapeHtml(texto) {
+        return String(texto)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function formatarMetodos(valor) {
+        const metodos = normalizarMetodos(valor);
+        if (metodos.length === 0) {
+            return '<span class="metodo-tag">Nao informado</span>';
+        }
+
+        return metodos
+            .map((metodo) => `<span class="metodo-tag">${escapeHtml(metodo)}</span>`)
+            .join('');
+    }
+
     function formatarCientifico(valor) {
         const n = valorSeguro(valor);
         if (n === 0) {
@@ -138,6 +249,35 @@
         const exp = Math.floor(Math.log10(n));
         const mant = n / Math.pow(10, exp);
         return `${mant.toFixed(3)} x 10^${exp}`;
+    }
+
+    function montarResumo(p) {
+        const metodos = formatarMetodos(p.discoveryMethods || p.discoveryMethod);
+
+        return `
+            <div class="resumo-grid">
+                <section class="resumo-card">
+                    <h4>Descoberta</h4>
+                    <div class="resumo-item"><span>Ano</span><b>${formatarAno(p.discoveryYear)}</b></div>
+                    <div class="resumo-item"><span>Metodo(s)</span><div class="metodos">${metodos}</div></div>
+                    <div class="resumo-item"><span>Distancia</span><b>${formatar(p.distanceParsec)} pc (~${formatar(p.distanceLightYears)} anos-luz)</b></div>
+                </section>
+
+                <section class="resumo-card">
+                    <h4>Referencia Terra</h4>
+                    <div class="resumo-item"><span>Periodo</span><b>${formatar(p.periodoTerraDias)} dias</b></div>
+                    <div class="resumo-item"><span>Raio</span><b>${formatarInteiro(p.raioTerraKm)} km</b></div>
+                    <div class="resumo-item"><span>Massa</span><b>${formatarCientifico(p.massaTerraKg)} kg</b></div>
+                </section>
+
+                <section class="resumo-card">
+                    <h4>Planeta</h4>
+                    <div class="resumo-item"><span>Periodo</span><b>${formatar(p.periodoPlanetaDias)} dias (${formatar(p.periodoTerraX)}x Terra)</b></div>
+                    <div class="resumo-item"><span>Raio</span><b>${formatarInteiro(p.raioPlanetaKm)} km (${formatar(p.raioTerraX)}x Terra)</b></div>
+                    <div class="resumo-item"><span>Massa</span><b>${formatarCientifico(p.massaPlanetaKg)} kg (${formatar(p.massaTerraX)}x Terra)</b></div>
+                </section>
+            </div>
+        `;
     }
 
     async function carregarDados() {
@@ -179,13 +319,7 @@
         }
 
         document.getElementById('titulo').textContent = p.planeta;
-        document.getElementById('resumo').innerHTML =
-            `Referencia Terra: periodo <b>${formatar(p.periodoTerraDias)} dias</b>, ` +
-            `raio <b>${formatarInteiro(p.raioTerraKm)} km</b>, ` +
-            `massa <b>${formatarCientifico(p.massaTerraKg)} kg</b>. ` +
-            `Planeta: periodo <b>${formatar(p.periodoPlanetaDias)} dias</b> (${formatar(p.periodoTerraX)}x Terra), ` +
-            `raio <b>${formatarInteiro(p.raioPlanetaKm)} km</b> (${formatar(p.raioTerraX)}x Terra), ` +
-            `massa <b>${formatarCientifico(p.massaPlanetaKg)} kg</b> (${formatar(p.massaTerraX)}x Terra).`;
+        document.getElementById('resumo').innerHTML = montarResumo(p);
 
         desenharComparacao(
             'grafico_comp_periodo',

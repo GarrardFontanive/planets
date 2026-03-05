@@ -1,9 +1,14 @@
+package bo;
+
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import dto.Planet;
+import dto.PlanetAggregate;
 
 public class DataProcessor {
 
@@ -29,9 +34,12 @@ public class DataProcessor {
                 }
 
                 PlanetAggregate agregado = mapa.computeIfAbsent(nome, k -> new PlanetAggregate());
+                adicionarInteiro(agregado.getDiscoveryYears(), dados[1]);
+                adicionarTexto(agregado.getDiscoveryMethods(), dados[2]);
                 adicionarValor(agregado.getOrbitalPeriods(), dados[3]);
                 adicionarValor(agregado.getRadii(), dados[4]);
                 adicionarValor(agregado.getMasses(), dados[5]);
+                adicionarValor(agregado.getDistances(), dados[6]);
             }
         }
 
@@ -49,9 +57,12 @@ public class DataProcessor {
 
             Planet planeta = new Planet();
             planeta.setName(entry.getKey());
+            planeta.setDiscoveryYear(obterMaiorAno(agregado.getDiscoveryYears()));
+            planeta.setDiscoveryMethod(obterMetodoMaisFrequente(agregado.getDiscoveryMethods()));
             planeta.setOrbitalPeriod(calc.calcularMedia(agregado.getOrbitalPeriods()));
             planeta.setRadius(calc.calcularMedia(agregado.getRadii()));
             planeta.setMass(calc.calcularMedia(agregado.getMasses()));
+            planeta.setDistance(calc.calcularMedia(agregado.getDistances()));
             consolidados.add(planeta);
         }
 
@@ -76,6 +87,61 @@ public class DataProcessor {
             lista.add(Double.parseDouble(valorLimpo));
         } catch (NumberFormatException ignored) {
         }
+    }
+
+    private static void adicionarInteiro(List<Integer> lista, String valorStr) {
+        if (valorStr == null) {
+            return;
+        }
+
+        String valorLimpo = limparTexto(valorStr);
+        if (valorLimpo.isBlank()) {
+            return;
+        }
+
+        try {
+            lista.add(Integer.parseInt(valorLimpo));
+        } catch (NumberFormatException ignored) {
+        }
+    }
+
+    private static void adicionarTexto(List<String> lista, String valorStr) {
+        String valorLimpo = limparTexto(valorStr);
+        if (!valorLimpo.isBlank()) {
+            lista.add(valorLimpo);
+        }
+    }
+
+    private static int obterMaiorAno(List<Integer> anos) {
+        int maiorAno = 0;
+        for (int ano : anos) {
+            if (ano > maiorAno) {
+                maiorAno = ano;
+            }
+        }
+        return maiorAno;
+    }
+
+    private static String obterMetodoMaisFrequente(List<String> metodos) {
+        if (metodos.isEmpty()) {
+            return "Nao informado";
+        }
+
+        Map<String, Integer> frequencias = new HashMap<>();
+        String melhorMetodo = metodos.get(0);
+        int maiorFrequencia = 0;
+
+        for (String metodo : metodos) {
+            int freq = frequencias.getOrDefault(metodo, 0) + 1;
+            frequencias.put(metodo, freq);
+
+            if (freq > maiorFrequencia) {
+                maiorFrequencia = freq;
+                melhorMetodo = metodo;
+            }
+        }
+
+        return melhorMetodo;
     }
 
     private static String[] parseCsvLine(String linha) {

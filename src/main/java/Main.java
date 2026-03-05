@@ -26,11 +26,17 @@ public class Main {
 
     private static final String OUTPUT_FILE = "saida.txt";
     private static final String TEMPLATE_FILE = "src/web/template.html";
+    private static final String JSON_FILE = "planetas.json";
+    private static final String XML_FILE = "planetas.xml";
 
     private static final double EARTH_ORBITAL_PERIOD_DAYS = 365.25;
     private static final double EARTH_RADIUS_KM = 6371.0;
     private static final double EARTH_MASS_KG = 5.972e24;
     private static final double PARSEC_TO_LIGHT_YEAR = 3.26156;
+
+    private static boolean jsonGerado = false;
+    private static boolean xmlGerado = false;
+    private static boolean bancoAtualizado = false;
 
     public static void main(String[] args) throws Exception {
         Sorter sorter = new Sorter();
@@ -49,6 +55,7 @@ public class Main {
 
         List<Planet> planetasConsolidados = new ArrayList<>();
         String todosOsDadosJson = montarJson(dadosAgrupados, calc, planetasConsolidados);
+        persistirDadosIniciais(planetasConsolidados);
 
         HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
 
@@ -60,29 +67,62 @@ public class Main {
         server.createContext("/dados", exchange ->
                 responder(exchange, 200, todosOsDadosJson, "application/json; charset=UTF-8"));
 
-        server.createContext("/atualizar-banco", exchange -> executarAcao(
-                exchange,
-                () -> new Conexao().salvarNoMySQL(planetasConsolidados),
-                "Banco de dados MySQL atualizado com sucesso!"
-        ));
+        server.createContext("/atualizar-banco", exchange -> {
+            if (bancoAtualizado) {
+                responder(exchange, 200, "Banco de dados ja esta atualizado.", "text/plain; charset=UTF-8");
+                return;
+            }
+
+            executarAcao(
+                    exchange,
+                    () -> {
+                        new Conexao().salvarNoMySQL(planetasConsolidados);
+                        bancoAtualizado = true;
+                    },
+                    "Banco de dados MySQL atualizado com sucesso!"
+            );
+        });
 
         server.createContext("/limpar-banco", exchange -> executarAcao(
                 exchange,
-                () -> new Conexao().limparBaseDeDados(),
+                () -> {
+                    new Conexao().limparBaseDeDados();
+                    bancoAtualizado = false;
+                },
                 "Base de dados limpa com sucesso!"
         ));
 
-        server.createContext("/gerar-json", exchange -> executarAcao(
-                exchange,
-                () -> new Persistencia().salvarJSON(planetasConsolidados),
-                "Arquivo planetas.json gerado com sucesso!"
-        ));
+        server.createContext("/gerar-json", exchange -> {
+            if (jsonGerado && arquivoGerado(JSON_FILE)) {
+                responder(exchange, 200, "Arquivo planetas.json ja foi gerado.", "text/plain; charset=UTF-8");
+                return;
+            }
 
-        server.createContext("/gerar-xml", exchange -> executarAcao(
-                exchange,
-                () -> new Persistencia().salvarXML(planetasConsolidados),
-                "Arquivo planetas.xml gerado com sucesso!"
-        ));
+            executarAcao(
+                    exchange,
+                    () -> {
+                        new Persistencia().salvarJSON(planetasConsolidados);
+                        jsonGerado = arquivoGerado(JSON_FILE);
+                    },
+                    "Arquivo planetas.json gerado com sucesso!"
+            );
+        });
+
+        server.createContext("/gerar-xml", exchange -> {
+            if (xmlGerado && arquivoGerado(XML_FILE)) {
+                responder(exchange, 200, "Arquivo planetas.xml ja foi gerado.", "text/plain; charset=UTF-8");
+                return;
+            }
+
+            executarAcao(
+                    exchange,
+                    () -> {
+                        new Persistencia().salvarXML(planetasConsolidados);
+                        xmlGerado = arquivoGerado(XML_FILE);
+                    },
+                    "Arquivo planetas.xml gerado com sucesso!"
+            );
+        });
 
         server.setExecutor(null);
         server.start();
@@ -269,6 +309,56 @@ public class Main {
             return 0;
         }
         return valor;
+    }
+
+    private static boolean arquivoGerado(String nomeArquivo) {
+        try {
+            Path caminho = Path.of(nomeArquivo);
+            return Files.exists(caminho) && Files.size(caminho) > 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private static void persistirDadosIniciais(List<Planet> planetasConsolidados) {
+        Persistencia persistencia = new Persistencia();
+
+        try {
+            if (arquivoGerado(JSON_FILE)) {
+                jsonGerado = true;
+                System.out.println("Arquivo planetas.json ja existe.");
+            } else {
+                persistencia.salvarJSON(planetasConsolidados);
+                jsonGerado = arquivoGerado(JSON_FILE);
+                System.out.println("Arquivo planetas.json gerado.");
+            }
+        } catch (Exception e) {
+            jsonGerado = false;
+            System.out.println("Falha ao gerar JSON automaticamente: " + e.getMessage());
+        }
+
+        try {
+            if (arquivoGerado(XML_FILE)) {
+                xmlGerado = true;
+                System.out.println("Arquivo planetas.xml ja existe.");
+            } else {
+                persistencia.salvarXML(planetasConsolidados);
+                xmlGerado = arquivoGerado(XML_FILE);
+                System.out.println("Arquivo planetas.xml gerado.");
+            }
+        } catch (Exception e) {
+            xmlGerado = false;
+            System.out.println("Falha ao gerar XML automaticamente: " + e.getMessage());
+        }
+
+        try {
+            new Conexao().salvarNoMySQL(planetasConsolidados);
+            bancoAtualizado = true;
+            System.out.println("Persistencia no MySQL concluida.");
+        } catch (Exception e) {
+            bancoAtualizado = false;
+            System.out.println("Falha ao atualizar MySQL automaticamente: " + e.getMessage());
+        }
     }
 
     private static void executarAcao(HttpExchange exchange, Acao acao, String mensagemSucesso) throws IOException {

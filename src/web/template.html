@@ -125,6 +125,27 @@
             margin-bottom: 8px;
         }
 
+        .status-acao {
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            background: #f7f7f7;
+            font-size: 14px;
+            display: none;
+        }
+
+        .status-acao.ok {
+            border-color: #8cbf8c;
+            background: #eef8ee;
+            color: #1f4d1f;
+        }
+
+        .status-acao.erro {
+            border-color: #d9a4a4;
+            background: #fff1f1;
+            color: #7a1f1f;
+        }
+
         @media (max-width: 640px) {
             .resumo-item {
                 flex-direction: column;
@@ -171,6 +192,7 @@
         <button onclick="chamarApi('/gerar-json')">Gerar JSON</button>
         <button onclick="chamarApi('/gerar-xml')">Gerar XML</button>
     </div>
+    <div id="statusAcao" class="status-acao" aria-live="polite"></div>
 </div>
 
 <script>
@@ -178,6 +200,7 @@
     google.charts.setOnLoadCallback(carregarDados);
 
     const seletor = document.getElementById('seletorPlaneta');
+    const statusAcao = document.getElementById('statusAcao');
     let dadosGlobais = [];
 
     seletor.addEventListener('change', atualizarGrafico);
@@ -249,6 +272,12 @@
         const exp = Math.floor(Math.log10(n));
         const mant = n / Math.pow(10, exp);
         return `${mant.toFixed(3)} x 10^${exp}`;
+    }
+
+    function mostrarStatus(mensagem, erro) {
+        statusAcao.textContent = mensagem;
+        statusAcao.style.display = 'block';
+        statusAcao.className = erro ? 'status-acao erro' : 'status-acao ok';
     }
 
     function montarResumo(p) {
@@ -419,13 +448,18 @@
     async function chamarApi(rota) {
         try {
             const response = await fetch(rota);
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
             const mensagem = await response.text();
-            alert(mensagem);
+
+            if (!response.ok) {
+                throw new Error(mensagem || `HTTP ${response.status}`);
+            }
+
+            mostrarStatus(mensagem, false);
         } catch (error) {
-            alert('Nao foi possivel conectar ao backend em http://localhost:8080. Inicie a aplicacao Java e tente de novo.');
+            const mensagemErro = error && error.message && error.message !== 'Failed to fetch'
+                ? error.message
+                : 'Nao foi possivel conectar ao backend em http://localhost:8080. Inicie a aplicacao Java e tente de novo.';
+            mostrarStatus(mensagemErro, true);
         }
     }
 </script>

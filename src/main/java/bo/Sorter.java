@@ -2,7 +2,9 @@ package bo;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.FileWriter;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URL;
 import java.net.URLConnection;
@@ -14,7 +16,13 @@ public class Sorter {
     private static final String OUTPUT = "saida.txt";
 
     public void queryData() {
-        if (fileExists(OUTPUT)) {
+        if (arquivoJaCarregado(OUTPUT)) {
+            System.out.println("Arquivo de entrada ja carregado: " + OUTPUT);
+            return;
+        }
+
+        if (fileExists(OUTPUT) && arquivoEmUso(OUTPUT)) {
+            System.out.println("Arquivo de entrada esta aberto em outro programa. Feche e tente novamente.");
             return;
         }
 
@@ -40,5 +48,45 @@ public class Sorter {
 
     public boolean fileExists(String filename) {
         return new File(filename).exists();
+    }
+
+    private boolean arquivoJaCarregado(String filename) {
+        File arquivo = new File(filename);
+        if (!arquivo.exists() || arquivo.length() == 0) {
+            return false;
+        }
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(arquivo))) {
+            String cabecalho = reader.readLine();
+            String primeiraLinha = reader.readLine();
+
+            if (cabecalho == null || primeiraLinha == null) {
+                return false;
+            }
+
+            return cabecalho.contains("pl_name")
+                    && cabecalho.contains("disc_year")
+                    && cabecalho.contains("discoverymethod")
+                    && cabecalho.contains("pl_orbper")
+                    && cabecalho.contains("pl_rade")
+                    && cabecalho.contains("pl_masse")
+                    && cabecalho.contains("sy_dist")
+                    && !primeiraLinha.isBlank();
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    private boolean arquivoEmUso(String filename) {
+        File arquivo = new File(filename);
+        if (!arquivo.exists()) {
+            return false;
+        }
+
+        try (FileWriter ignored = new FileWriter(arquivo, true)) {
+            return false;
+        } catch (IOException e) {
+            return true;
+        }
     }
 }
